@@ -5,7 +5,10 @@
 
 .DESCRIPTION
     Phases: environment check (Node + Claude Code), plugin management, and MCP server merge.
-    Supports direct execution (.\setup.ps1) or pipe (irm <url> | iex).
+    Direct: .\setup.ps1
+    Remote: do not use irm | iex on this file (iex breaks param/CmdletBinding). Use:
+      iex ((Invoke-WebRequest '.../bootstrap.ps1' -UseBasicParsing).Content)
+    or: & ([scriptblock]::Create((Invoke-WebRequest '.../setup.ps1' -UseBasicParsing).Content)) @args
 
 .PARAMETER Mode
     Full        — environment check, install plugins, configure MCP.
@@ -23,7 +26,10 @@
     Overrides automatic detection of claude_desktop_config.json.
 
 .EXAMPLE
-    irm https://raw.githubusercontent.com/LastHasagi/claude-tunning/main/setup.ps1 | iex
+    iex ((Invoke-WebRequest 'https://raw.githubusercontent.com/LastHasagi/claude-tunning/main/bootstrap.ps1' -UseBasicParsing).Content)
+
+.EXAMPLE
+    & ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/LastHasagi/claude-tunning/main/setup.ps1' -UseBasicParsing).Content)) -Mode McpOnly
 
 .EXAMPLE
     .\setup.ps1 -Mode McpOnly
