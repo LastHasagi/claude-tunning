@@ -14,6 +14,6 @@ Local run (repo checkout):
 .\setup.ps1
 ```
 
-Optional: `-LocalPluginsPath .\plugins.txt`, `-SkipMcp`, `-SkipPlugins`. See header comment block in `setup.ps1`.
+Optional: `-Mode Full|PluginsOnly|McpOnly`, `-LocalPluginsPath`, `-PluginsRawUrl`, `-ClaudeDesktopConfigPath`. See comment-based help on `setup.ps1`.
 
-The startup banner is **ASCII-only** so it renders correctly in Windows PowerShell 5.1 without UTF-8/BOM tricks.
+Scripts are saved as **UTF-8 with BOM** so Windows PowerShell 5.1 parses Unicode correctly; run `tools/ensure-utf8bom.ps1` after edits if needed.
