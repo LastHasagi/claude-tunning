@@ -7,10 +7,10 @@
     Phases: environment check (Node + Claude Code), plugin management, and MCP server merge.
     Direct: .\setup.ps1
     Remote: never pipe setup.ps1 to iex (multiline scripts may run line-by-line; param/CmdletBinding then breaks).
-    Use bootstrap.ps1 (single line, safe for irm | iex):
+    Use bootstrap.ps1 (single line, UTF-8 without BOM, strips BOM from downloaded setup.ps1):
       irm 'https://raw.githubusercontent.com/LastHasagi/claude-tunning/main/bootstrap.ps1' | iex
     Or: iex ((Invoke-WebRequest '.../bootstrap.ps1' -UseBasicParsing).Content)
-    Parameters: & ([scriptblock]::Create((Invoke-WebRequest '.../setup.ps1' -UseBasicParsing).Content)) -Mode McpOnly
+    Parameters: download setup.ps1 to $t, strip leading U+FEFF if present, then & ([scriptblock]::Create($t)) -Mode McpOnly
 
 .PARAMETER Mode
     Full        — environment check, install plugins, configure MCP.
@@ -31,7 +31,7 @@
     iex ((Invoke-WebRequest 'https://raw.githubusercontent.com/LastHasagi/claude-tunning/main/bootstrap.ps1' -UseBasicParsing).Content)
 
 .EXAMPLE
-    & ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/LastHasagi/claude-tunning/main/setup.ps1' -UseBasicParsing).Content)) -Mode McpOnly
+    $t = (Invoke-WebRequest 'https://raw.githubusercontent.com/LastHasagi/claude-tunning/main/setup.ps1' -UseBasicParsing).Content; if ($t.Length -gt 0 -and $t[0] -eq [char]0xFEFF) { $t = $t.Substring(1) }; & ([scriptblock]::Create($t)) -Mode McpOnly
 
 .EXAMPLE
     .\setup.ps1 -Mode McpOnly
