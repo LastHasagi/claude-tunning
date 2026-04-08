@@ -1,0 +1,16 @@
+# Z3R0 Claude — uma linha por plugin (URL ou identificador).
+# Linhas vazias e linhas que começam por # são ignoradas na instalação.
+# Senior Pack: exclui entradas que contenham "railway" ou "typescript" (ex.: typescript-lsp).
+# Adicionem mais repos que acharem interessante aqui nesse arquivo que ai vamos poder ter um projeto mais completo
+
+https://github.com/obra/superpowers
+https://claude.com/plugins/frontend-design
+https://claude.com/plugins/code-review
+https://claude.com/plugins/security-guidance
+https://github.com/thedotmack/claude-mem
+https://claude.com/plugins/context7
+https://claude.com/plugins/playwright
+https://claude.com/plugins/postman
+https://claude.com/plugins/remember
+https://claude.com/plugins/railway
+https://claude.com/plugins/typescript-lsp   
