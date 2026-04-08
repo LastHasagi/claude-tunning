@@ -4,7 +4,15 @@ PowerShell helper to tune **Claude Code** (plugins + MCP presets for Claude Desk
 
 ## Z3R0 Claude (remote one-liner)
 
-`Invoke-Expression` (`iex`) cannot run `setup.ps1` directly (top-level `param` / `CmdletBinding`). Use the bootstrap script or a scriptblock:
+Do **not** run `irm .../setup.ps1 | iex`: the pipeline can execute the script **one line at a time**, so `[CmdletBinding()]` / `param()` are no longer at the top of the parse unit and you get parser errors.
+
+`bootstrap.ps1` is intentionally **one line**, so `irm ... | iex` is safe:
+
+```powershell
+irm 'https://raw.githubusercontent.com/LastHasagi/claude-tunning/main/bootstrap.ps1' | iex
+```
+
+Equivalent (no pipe to `iex`):
 
 ```powershell
 iex ((Invoke-WebRequest 'https://raw.githubusercontent.com/LastHasagi/claude-tunning/main/bootstrap.ps1' -UseBasicParsing).Content)

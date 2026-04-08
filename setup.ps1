@@ -6,9 +6,11 @@
 .DESCRIPTION
     Phases: environment check (Node + Claude Code), plugin management, and MCP server merge.
     Direct: .\setup.ps1
-    Remote: do not use irm | iex on this file (iex breaks param/CmdletBinding). Use:
-      iex ((Invoke-WebRequest '.../bootstrap.ps1' -UseBasicParsing).Content)
-    or: & ([scriptblock]::Create((Invoke-WebRequest '.../setup.ps1' -UseBasicParsing).Content)) @args
+    Remote: never pipe setup.ps1 to iex (multiline scripts may run line-by-line; param/CmdletBinding then breaks).
+    Use bootstrap.ps1 (single line, safe for irm | iex):
+      irm 'https://raw.githubusercontent.com/LastHasagi/claude-tunning/main/bootstrap.ps1' | iex
+    Or: iex ((Invoke-WebRequest '.../bootstrap.ps1' -UseBasicParsing).Content)
+    Parameters: & ([scriptblock]::Create((Invoke-WebRequest '.../setup.ps1' -UseBasicParsing).Content)) -Mode McpOnly
 
 .PARAMETER Mode
     Full        — environment check, install plugins, configure MCP.
@@ -48,7 +50,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# ── Resolve script root (direct run and irm | iex) ─────────────────────────────
+# ── Resolve script root (.\setup.ps1 or scriptblock from bootstrap) ────────────
 $root = $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($root)) {
     $root = Join-Path $env:TEMP "z3r0-claude-$(Get-Date -Format 'yyyyMMddHHmmss')"
