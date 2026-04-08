@@ -1,1 +1,1 @@
-$ErrorActionPreference='Stop'; $t=(Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/LastHasagi/claude-tunning/main/setup.ps1' -UseBasicParsing).Content; if ($t.Length -gt 0 -and $t[0] -eq [char]0xFEFF) { $t = $t.Substring(1) }; & ([scriptblock]::Create($t)) @args
+$ErrorActionPreference='Stop';$t=(Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/LastHasagi/claude-tunning/main/setup.ps1' -UseBasicParsing).Content.TrimStart([char]0xFEFF);&([scriptblock]::Create($t))@args

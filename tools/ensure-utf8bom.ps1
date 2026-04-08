@@ -8,4 +8,12 @@ Get-ChildItem -LiteralPath $root -Recurse -Filter '*.ps1' -File | Where-Object {
     $text = [System.IO.File]::ReadAllText($_.FullName, $encNoBom)
     [System.IO.File]::WriteAllText($_.FullName, $text, $encBom)
 }
-Write-Host "UTF-8 BOM applied under: $root"
+$bootstrapPath = Join-Path $root 'bootstrap.ps1'
+if (Test-Path -LiteralPath $bootstrapPath) {
+    $boot = [System.IO.File]::ReadAllText($bootstrapPath, $encNoBom)
+    if ($boot.Length -gt 0 -and $boot[0] -eq [char]0xFEFF) { $boot = $boot.Substring(1) }
+    $boot = $boot.TrimEnd("`r", "`n") + [Environment]::NewLine
+    [System.IO.File]::WriteAllText($bootstrapPath, $boot, $encNoBom)
+    Write-Host "bootstrap.ps1: UTF-8 without BOM (remote iex)."
+}
+Write-Host "UTF-8 BOM applied under: $root (except bootstrap.ps1)"

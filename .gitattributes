@@ -1,0 +1,2 @@
+# Remote iex must not see a UTF-8 BOM before the first token; keep LF for stable raw bytes.
+bootstrap.ps1 text eol=lf
