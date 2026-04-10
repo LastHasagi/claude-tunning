@@ -259,9 +259,13 @@ function Invoke-PluginPhase {
     }
 
     $modeChoice = Show-PluginModeMenu
+    $seniorPackSelected = $false
 
     $toInstall = switch ($modeChoice) {
-        '1' { Get-SeniorPluginPack -Lines $allLines }
+        '1' {
+            $seniorPackSelected = $true
+            Get-SeniorPluginPack -Lines $allLines
+        }
         '2' {
             Write-Host ""
             Select-PluginsInteractive -Lines $allLines
@@ -302,4 +306,11 @@ function Invoke-PluginPhase {
 
     Write-Progress -Activity 'Installing plugins' -Completed
     Write-Ok "$total plugin(s) processed."
+
+    if ($seniorPackSelected) {
+        Write-Host ""
+        Write-Info 'Senior Pack extras: offering RTK setup.'
+        Invoke-RtkPhase
+        $script:SkipRtkPhaseAfterPlugins = $true
+    }
 }

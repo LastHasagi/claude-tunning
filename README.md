@@ -1,6 +1,6 @@
 # claude-tunning
 
-PowerShell helper to tune **Claude Code** (plugins + MCP presets for Claude Desktop).
+PowerShell helper to tune **Claude Code** (plugins + MCP presets for Claude Desktop) and optionally install/configure **RTK** (`rtk-ai/rtk`) for command output compression.
 
 ## Z3R0 Claude (remote one-liner)
 

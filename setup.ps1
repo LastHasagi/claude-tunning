@@ -4,7 +4,7 @@
     Z3R0 Claude — guided setup for Claude Code, plugins, and MCP (Windows).
 
 .DESCRIPTION
-    Phases: environment check (Node + Claude Code), plugin management, and MCP server merge.
+    Phases: environment check (Node + Claude Code), plugin management, MCP server merge, and optional RTK setup.
     Direct: .\setup.ps1
     Remote: never pipe setup.ps1 to iex (multiline scripts may run line-by-line; param/CmdletBinding then breaks).
     Use bootstrap.ps1 (single line, UTF-8 without BOM; setup text uses .Content.TrimStart([char]0xFEFF)):
@@ -13,8 +13,8 @@
     Parameters: $t = (iwr '.../setup.ps1' -UseBasicParsing).Content.TrimStart([char]0xFEFF); & ([scriptblock]::Create($t)) -Mode McpOnly
 
 .PARAMETER Mode
-    Full        — environment check, install plugins, configure MCP.
-    PluginsOnly — install Claude Code plugins only.
+    Full        — environment check, install plugins, configure MCP, optional RTK setup.
+    PluginsOnly — install Claude Code plugins and optional RTK setup.
     McpOnly     — configure MCP servers only.
     (Omit to show the interactive menu.)
 
@@ -58,7 +58,7 @@ if ([string]::IsNullOrWhiteSpace($root)) {
 
     Write-Host '  Downloading libraries...' -ForegroundColor Cyan
     $base = 'https://raw.githubusercontent.com/LastHasagi/claude-tunning/main'
-    foreach ($lib in 'lib/ui.ps1','lib/plugins.ps1','lib/mcp.ps1') {
+    foreach ($lib in 'lib/ui.ps1','lib/plugins.ps1','lib/mcp.ps1','lib/rtk.ps1') {
         $dest = Join-Path $root ($lib -replace '/','\')
         Invoke-WebRequest -Uri "$base/$lib" -OutFile $dest -UseBasicParsing -ErrorAction Stop
     }
@@ -68,9 +68,11 @@ if ([string]::IsNullOrWhiteSpace($root)) {
 . (Join-Path $root 'lib\ui.ps1')
 . (Join-Path $root 'lib\plugins.ps1')
 . (Join-Path $root 'lib\mcp.ps1')
+. (Join-Path $root 'lib\rtk.ps1')
 
 # ── Startup ───────────────────────────────────────────────────────────────────
 Write-Banner
+$script:SkipRtkPhaseAfterPlugins = $false
 
 # Phase 0 — main menu (only if -Mode was not passed explicitly)
 if (-not $PSBoundParameters.ContainsKey('Mode') -or [string]::IsNullOrWhiteSpace($Mode)) {
@@ -95,6 +97,13 @@ if ($Mode -in 'Full','PluginsOnly') {
 # ── Phase 3 — MCP ────────────────────────────────────────────────────────────
 if ($Mode -in 'Full','McpOnly') {
     Invoke-McpPhase -ClaudeDesktopConfigPath $ClaudeDesktopConfigPath
+}
+
+# ── Phase 4 — RTK (optional, useful for Claude/Cursor shell compression) ──────
+if ($Mode -in 'Full','PluginsOnly') {
+    if (-not $script:SkipRtkPhaseAfterPlugins) {
+        Invoke-RtkPhase
+    }
 }
 
 # ── Done ──────────────────────────────────────────────────────────────────────

@@ -9,9 +9,9 @@ $null = & {
     if ('Z3R0.Win32.Kernel32' -as [type]) { return }
     try {
         Add-Type -Namespace Z3R0.Win32 -Name Kernel32 -MemberDefinition @'
-[DllImport("kernel32.dll")] public static extern IntPtr GetStdHandle(int n);
-[DllImport("kernel32.dll")] public static extern bool   GetConsoleMode(IntPtr h, out uint m);
-[DllImport("kernel32.dll")] public static extern bool   SetConsoleMode(IntPtr h, uint m);
+            [DllImport("kernel32.dll")] public static extern IntPtr GetStdHandle(int n);
+            [DllImport("kernel32.dll")] public static extern bool   GetConsoleMode(IntPtr h, out uint m);
+            [DllImport("kernel32.dll")] public static extern bool   SetConsoleMode(IntPtr h, uint m);
 '@ -ErrorAction Stop
     } catch { return }
     try {
@@ -233,22 +233,28 @@ function Select-PluginsInteractive {
     if ($Lines.Count -eq 0) { return @() }
 
     $A           = $script:Ansi
+    $esc         = [char]27
     $maxViewport = 12
     $viewport    = [Math]::Min($maxViewport, $Lines.Count)
     $viewStart   = 0
     $cursor      = 0
     $boxInner    = 70
+    $maxTextLen  = $boxInner - 8
+    # top-border(1) + title(1) + hint(1) + separator(1) + items($viewport) + scroll-row(1) + bottom-border(1) + counter(1)
+    $fixedHeight = $viewport + 7
+    $drawnOnce   = $false
 
-    # Selection state
     $selected = New-Object bool[] $Lines.Count
-    for ($i = 0; $i -lt $Lines.Count; $i++) { $selected[$i] = $true }
+    for ($si = 0; $si -lt $Lines.Count; $si++) { $selected[$si] = $true }
 
-    $maxTextLen = $boxInner - 8   # room for "│ ► [✓] " prefix + text
+    # dot-sourced (. $drawFrame) so writes to $drawnOnce stay in this scope
+    $drawFrame = {
+        if ($drawnOnce) {
+            # cursor previous line (relative, works in VS Code / Cursor terminal) + clear to end
+            [Console]::Write("${esc}[${fixedHeight}F${esc}[J")
+        }
+        $drawnOnce = $true
 
-    $redraw = {
-        [Console]::SetCursorPosition(0, $startTop)
-
-        # Header
         Write-Host "  $($A.C)┌$('─' * $boxInner)┐$($A.Rst)"
         $h1 = ' Z3R0 Claude — Plugin selection'
         Write-Host "  $($A.C)│$($A.Bo)$($A.W)$h1$(' ' * ($boxInner - $h1.Length))$($A.Rst)$($A.C)│$($A.Rst)"
@@ -256,94 +262,68 @@ function Select-PluginsInteractive {
         if ($h2.Length -gt $boxInner) { $h2 = $h2.Substring(0, $boxInner) }
         Write-Host "  $($A.C)│$($A.Di)$($A.Gr)$h2$(' ' * ($boxInner - $h2.Length))$($A.Rst)$($A.C)│$($A.Rst)"
         Write-Host "  $($A.C)├$('─' * $boxInner)┤$($A.Rst)"
-
-        # Visible rows
         for ($vi = 0; $vi -lt $viewport; $vi++) {
-            $idx = $viewStart + $vi
-
+            $idx   = $viewStart + $vi
             $arrow = if ($idx -eq $cursor) { "$($A.Y)►$($A.Rst)" } else { ' ' }
             $chk   = if ($selected[$idx])  { "$($A.G)✓$($A.Rst)" } else { "$($A.Gr) $($A.Rst)" }
-
-            $text = $Lines[$idx]
+            $text  = $Lines[$idx]
             if ($text.Length -gt $maxTextLen) { $text = $text.Substring(0, $maxTextLen - 1) + '…' }
             $pad = ' ' * ($maxTextLen - $text.Length)
-
             Write-Host "  $($A.C)│$($A.Rst) $arrow [$chk] $text$pad $($A.C)│$($A.Rst)"
         }
-
-        # Scroll hint
-        $hasMore  = ($viewStart + $viewport) -lt $Lines.Count
-        $hasAbove = $viewStart -gt 0
-        $scrollTxt = if ($hasAbove -and $hasMore) { " ▲▼ more items above and below" }
-                     elseif ($hasMore)             { " ▼ more items below" }
-                     elseif ($hasAbove)            { " ▲ more items above" }
-                     else                          { '' }
-
-        if ($scrollTxt) {
-            Write-Host "  $($A.C)│$($A.Gr)$($A.Di)$scrollTxt$(' ' * ($boxInner - $scrollTxt.Length))$($A.Rst)$($A.C)│$($A.Rst)"
-        }
-
-        # Footer
-        $selCount = 0
-        foreach ($s in $selected) { if ($s) { $selCount++ } }
+        # scroll row always rendered to keep height fixed
+        $hasMore   = ($viewStart + $viewport) -lt $Lines.Count
+        $hasAbove  = $viewStart -gt 0
+        $scrollTxt = if ($hasAbove -and $hasMore) { ' ▲▼ more above and below' }
+                     elseif ($hasMore)             { ' ▼ more items below'      }
+                     elseif ($hasAbove)            { ' ▲ more items above'      }
+                     else                          { ''                         }
+        Write-Host "  $($A.C)│$($A.Gr)$($A.Di)$scrollTxt$(' ' * ($boxInner - $scrollTxt.Length))$($A.Rst)$($A.C)│$($A.Rst)"
         Write-Host "  $($A.C)└$('─' * $boxInner)┘$($A.Rst)"
+        $selCount = 0
+        foreach ($sv in $selected) { if ($sv) { $selCount++ } }
         Write-Host "  $($A.Gr)Selected: $($A.G)$selCount$($A.Gr) of $($Lines.Count)$($A.Rst)   "
     }
 
-    $startTop = [Console]::CursorTop
     [Console]::CursorVisible = $false
-
     try {
-        & $redraw
+        . $drawFrame
 
         while ($true) {
-            $key = [Console]::ReadKey($true)
+            $key     = [Console]::ReadKey($true)
+            $keyName = $key.Key.ToString()
 
-            switch ($key.Key) {
-                'UpArrow' {
-                    if ($cursor -gt 0) {
-                        $cursor--
-                        if ($cursor -lt $viewStart) { $viewStart = $cursor }
+            if ($keyName -eq 'UpArrow') {
+                if ($cursor -gt 0) {
+                    $cursor--
+                    if ($cursor -lt $viewStart) { $viewStart = $cursor }
+                }
+            } elseif ($keyName -eq 'DownArrow') {
+                if ($cursor -lt ($Lines.Count - 1)) {
+                    $cursor++
+                    if ($cursor -ge ($viewStart + $viewport)) {
+                        $viewStart = $cursor - $viewport + 1
                     }
                 }
-                'DownArrow' {
-                    if ($cursor -lt ($Lines.Count - 1)) {
-                        $cursor++
-                        if ($cursor -ge ($viewStart + $viewport)) {
-                            $viewStart = $cursor - $viewport + 1
-                        }
-                    }
+            } elseif ($keyName -eq 'Spacebar') {
+                $selected[$cursor] = -not $selected[$cursor]
+            } elseif ($keyName -eq 'Escape') {
+                Write-Host ""
+                return @()
+            } elseif ($keyName -eq 'Enter') {
+                Write-Host ""
+                $result = [System.Collections.Generic.List[string]]::new()
+                for ($ri = 0; $ri -lt $Lines.Count; $ri++) {
+                    if ($selected[$ri]) { $result.Add($Lines[$ri]) }
                 }
-                'Spacebar' {
-                    $selected[$cursor] = -not $selected[$cursor]
-                }
-                'Escape' {
-                    $hasScrollRow = (($viewStart + $viewport) -lt $Lines.Count) -or ($viewStart -gt 0)
-                    $linesUsed     = $viewport + $(if ($hasScrollRow) { 1 } else { 0 }) + 5
-                    [Console]::SetCursorPosition(0, $startTop + $linesUsed)
-                    Write-Host ""
-                    return @()
-                }
-                'Enter' {
-                    $linesUsed = $viewport + 5
-                    [Console]::SetCursorPosition(0, $startTop + $linesUsed + 1)
-                    Write-Host ""
-                    $result = [System.Collections.Generic.List[string]]::new()
-                    for ($i = 0; $i -lt $Lines.Count; $i++) {
-                        if ($selected[$i]) { $result.Add($Lines[$i]) }
-                    }
-                    return ,$result.ToArray()
-                }
-            }
-
-            # Toggle all / none with 'A'
-            if ($key.KeyChar -eq 'a' -or $key.KeyChar -eq 'A') {
+                return ,$result.ToArray()
+            } elseif ($key.KeyChar -eq 'a' -or $key.KeyChar -eq 'A') {
                 $anyOn = $false
-                foreach ($s in $selected) { if ($s) { $anyOn = $true; break } }
-                for ($i = 0; $i -lt $selected.Count; $i++) { $selected[$i] = -not $anyOn }
+                foreach ($sv in $selected) { if ($sv) { $anyOn = $true; break } }
+                for ($ri = 0; $ri -lt $selected.Count; $ri++) { $selected[$ri] = -not $anyOn }
             }
 
-            & $redraw
+            . $drawFrame
         }
     } finally {
         [Console]::CursorVisible = $true
