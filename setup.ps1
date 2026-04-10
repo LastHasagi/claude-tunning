@@ -16,6 +16,7 @@
     Full        — environment check, install plugins, configure MCP, optional RTK setup.
     PluginsOnly — install Claude Code plugins and optional RTK setup.
     McpOnly     — configure MCP servers only.
+    McpMarketplace — list/install/remove MCP servers via presets.
     (Omit to show the interactive menu.)
 
 .PARAMETER LocalPluginsPath
@@ -38,14 +39,22 @@
 
 .EXAMPLE
     .\setup.ps1 -Mode PluginsOnly -LocalPluginsPath .\my-plugins.txt
+
+.EXAMPLE
+    .\setup.ps1 -Mode McpMarketplace -McpAction Install -McpServer github,filesystem -McpTarget Both
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Full', 'PluginsOnly', 'McpOnly')]
+    [ValidateSet('Full', 'PluginsOnly', 'McpOnly', 'McpMarketplace')]
     [string]$Mode                    = '',
     [string]$LocalPluginsPath        = '',
     [string]$PluginsRawUrl           = 'https://raw.githubusercontent.com/LastHasagi/claude-tunning/main/plugins.txt',
-    [string]$ClaudeDesktopConfigPath = ''
+    [string]$ClaudeDesktopConfigPath = '',
+    [ValidateSet('List', 'Install', 'Remove')]
+    [string]$McpAction               = '',
+    [string[]]$McpServer             = @(),
+    [ValidateSet('ClaudeCode', 'Desktop', 'Both')]
+    [string]$McpTarget               = 'ClaudeCode'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -82,7 +91,7 @@ if (-not $PSBoundParameters.ContainsKey('Mode') -or [string]::IsNullOrWhiteSpace
 }
 
 # ── Phase 1 — environment (required for plugins; optional for MCP-only) ────────
-if ($Mode -ne 'McpOnly') {
+if ($Mode -in 'Full','PluginsOnly') {
     Assert-Environment
 }
 
@@ -97,6 +106,13 @@ if ($Mode -in 'Full','PluginsOnly') {
 # ── Phase 3 — MCP ────────────────────────────────────────────────────────────
 if ($Mode -in 'Full','McpOnly') {
     Invoke-McpPhase -ClaudeDesktopConfigPath $ClaudeDesktopConfigPath
+}
+if ($Mode -eq 'McpMarketplace') {
+    Invoke-McpMarketplacePhase `
+        -Action $McpAction `
+        -Server $McpServer `
+        -Target $McpTarget `
+        -ClaudeDesktopConfigPath $ClaudeDesktopConfigPath
 }
 
 # ── Phase 4 — RTK (optional, useful for Claude/Cursor shell compression) ──────

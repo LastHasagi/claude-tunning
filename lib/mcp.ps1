@@ -26,6 +26,34 @@ function Get-DefaultMcpServers {
         }
     }
 }
+function Get-McpMarketplaceCatalog {
+    $docsPath = Join-Path $env:USERPROFILE 'Documents'
+    return @{
+        'google-search' = @{
+            command = 'npx'
+            args    = @('-y', '@modelcontextprotocol/server-google-search')
+            env     = @{
+                GOOGLE_API_KEY = 'REPLACE_WITH_GOOGLE_API_KEY'
+                GOOGLE_CSE_ID  = 'REPLACE_WITH_GOOGLE_CSE_ID'
+            }
+        }
+        'github' = @{
+            command = 'npx'
+            args    = @('-y', '@modelcontextprotocol/server-github')
+            env     = @{
+                GITHUB_PERSONAL_ACCESS_TOKEN = 'REPLACE_WITH_GITHUB_PAT'
+            }
+        }
+        'filesystem' = @{
+            command = 'npx'
+            args    = @('-y', '@modelcontextprotocol/server-filesystem', $docsPath)
+        }
+        'context7' = @{
+            command = 'npx'
+            args    = @('-y', '@upstash/context7-mcp@latest')
+        }
+    }
+}
 
 # ── Recursive conversion for JavaScriptSerializer-compatible types ────────────
 function ConvertTo-JssCompatible {
@@ -56,34 +84,29 @@ function ConvertTo-JssCompatible {
         return $Node
     }
 }
-
-# ── Merge servers into a config file ──────────────────────────────────────────
-function Merge-McpServers {
-    param(
-        [Parameter(Mandatory)][string]$ConfigPath,
-        [Parameter(Mandatory)][hashtable]$Servers
-    )
+function Get-ConfigModel {
+    param([Parameter(Mandatory)][string]$ConfigPath)
 
     Add-Type -AssemblyName System.Web.Extensions
-    $jss                = New-Object System.Web.Script.Serialization.JavaScriptSerializer
-    $jss.MaxJsonLength  = [Int32]::MaxValue
-    $utf8               = [System.Text.UTF8Encoding]::new($false)
+    $jss               = New-Object System.Web.Script.Serialization.JavaScriptSerializer
+    $jss.MaxJsonLength = [Int32]::MaxValue
+    $utf8              = [System.Text.UTF8Encoding]::new($false)
 
-    # Ensure directory exists
     $dir = [System.IO.Path]::GetDirectoryName($ConfigPath)
     if (-not [string]::IsNullOrWhiteSpace($dir) -and -not (Test-Path -LiteralPath $dir)) {
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
     }
 
-    # Read existing JSON (backup on parse error)
     $raw = '{}'
     if (Test-Path -LiteralPath $ConfigPath) {
-        try   { $raw = [System.IO.File]::ReadAllText($ConfigPath, $utf8) }
-        catch { $raw = '{}' }
+        try {
+            $raw = [System.IO.File]::ReadAllText($ConfigPath, $utf8)
+        } catch {
+            $raw = '{}'
+        }
     }
     if ([string]::IsNullOrWhiteSpace($raw)) { $raw = '{}' }
 
-    # Deserialize and normalize
     $root = $null
     try {
         $parsed = $jss.DeserializeObject($raw)
@@ -103,15 +126,104 @@ function Merge-McpServers {
         $root = New-Object 'System.Collections.Generic.Dictionary[string,Object]'
     }
 
-    # Get or create 'mcpServers' key
-    $mcp = $null
-    if ($root.ContainsKey('mcpServers') -and $root['mcpServers'] -is [System.Collections.IDictionary]) {
-        $mcp = $root['mcpServers']
-    } else {
-        if ($root.ContainsKey('mcpServers')) { [void]$root.Remove('mcpServers') }
-        $mcp = New-Object 'System.Collections.Generic.Dictionary[string,Object]'
-        [void]$root.Add('mcpServers', $mcp)
+    return [PSCustomObject]@{
+        Root = $root
+        Jss  = $jss
+        Utf8 = $utf8
     }
+}
+function Ensure-McpServersNode {
+    param([Parameter(Mandatory)][System.Collections.IDictionary]$Root)
+    if ($Root.ContainsKey('mcpServers') -and $Root['mcpServers'] -is [System.Collections.IDictionary]) {
+        return $Root['mcpServers']
+    }
+    if ($Root.ContainsKey('mcpServers')) { [void]$Root.Remove('mcpServers') }
+    $mcp = New-Object 'System.Collections.Generic.Dictionary[string,Object]'
+    [void]$Root.Add('mcpServers', $mcp)
+    return $mcp
+}
+function Save-ConfigModel {
+    param(
+        [Parameter(Mandatory)][string]$ConfigPath,
+        [Parameter(Mandatory)]$Model
+    )
+    [System.IO.File]::WriteAllText($ConfigPath, $Model.Jss.Serialize($Model.Root), $Model.Utf8)
+}
+function Normalize-McpServerNames {
+    param([string[]]$Names)
+    $result = [System.Collections.Generic.List[string]]::new()
+    foreach ($entry in @($Names)) {
+        if ([string]::IsNullOrWhiteSpace($entry)) { continue }
+        foreach ($part in ($entry -split ',')) {
+            $n = $part.Trim().ToLowerInvariant()
+            if ([string]::IsNullOrWhiteSpace($n)) { continue }
+            if (-not $result.Contains($n)) { $result.Add($n) }
+        }
+    }
+    return ,$result.ToArray()
+}
+function Resolve-McpTargetsByName {
+    param(
+        [string]$Target = 'ClaudeCode',
+        [string]$ExplicitPath = ''
+    )
+    if (-not [string]::IsNullOrWhiteSpace($ExplicitPath)) {
+        return ,@($ExplicitPath)
+    }
+    $cliPath     = Join-Path $env:USERPROFILE '.claude\settings.json'
+    $desktopPath = Join-Path $env:APPDATA 'Claude\claude_desktop_config.json'
+    $normalized  = ([string]$Target).Trim().ToLowerInvariant()
+    switch ($normalized) {
+        'claudecode' { return ,@($cliPath) }
+        'desktop'    { return ,@($desktopPath) }
+        'both'       { return ,@($cliPath, $desktopPath) }
+        default      { return ,@($cliPath) }
+    }
+}
+function Prompt-McpServerSelection {
+    param([Parameter(Mandatory)][hashtable]$Catalog)
+    Write-Host ""
+    Write-Host '  Available preset MCP servers:'
+    $all = @($Catalog.Keys | Sort-Object)
+    foreach ($name in $all) {
+        Write-Host "  - $name"
+    }
+    $raw = Read-Host '  Type one or more names separated by comma'
+    return ,(Normalize-McpServerNames -Names @($raw))
+}
+function Get-McpServerNamesFromConfig {
+    param([Parameter(Mandatory)][string]$ConfigPath)
+    $model = Get-ConfigModel -ConfigPath $ConfigPath
+    $mcp   = Ensure-McpServersNode -Root $model.Root
+    return ,@($mcp.Keys | Sort-Object)
+}
+function Remove-McpServersFromConfig {
+    param(
+        [Parameter(Mandatory)][string]$ConfigPath,
+        [Parameter(Mandatory)][string[]]$Names
+    )
+    $model   = Get-ConfigModel -ConfigPath $ConfigPath
+    $mcp     = Ensure-McpServersNode -Root $model.Root
+    $removed = [System.Collections.Generic.List[string]]::new()
+    foreach ($name in $Names) {
+        if ($mcp.ContainsKey($name)) {
+            [void]$mcp.Remove($name)
+            $removed.Add($name) | Out-Null
+        }
+    }
+    Save-ConfigModel -ConfigPath $ConfigPath -Model $model
+    return ,$removed.ToArray()
+}
+
+# ── Merge servers into a config file ──────────────────────────────────────────
+function Merge-McpServers {
+    param(
+        [Parameter(Mandatory)][string]$ConfigPath,
+        [Parameter(Mandatory)][hashtable]$Servers
+    )
+
+    $model = Get-ConfigModel -ConfigPath $ConfigPath
+    $mcp   = Ensure-McpServersNode -Root $model.Root
 
     # Merge servers (overwrites existing entries)
     foreach ($k in $Servers.Keys) {
@@ -120,7 +232,7 @@ function Merge-McpServers {
         [void]$mcp.Add($k, $v)
     }
 
-    [System.IO.File]::WriteAllText($ConfigPath, $jss.Serialize($root), $utf8)
+    Save-ConfigModel -ConfigPath $ConfigPath -Model $model
 }
 
 # ── Resolve target config files ───────────────────────────────────────────────
@@ -133,6 +245,100 @@ function Resolve-McpTargets {
     $desktopPath = Join-Path $env:APPDATA    'Claude\claude_desktop_config.json'
 
     return ,(Show-McpTargetMenu -ClaudeCodePath $cliPath -DesktopPath $desktopPath)
+}
+function Invoke-McpMarketplacePhase {
+    param(
+        [string]$Action = '',
+        [string[]]$Server = @(),
+        [string]$Target = 'ClaudeCode',
+        [string]$ClaudeDesktopConfigPath = ''
+    )
+    Write-StepHeader 'Phase 3 — MCP marketplace CLI'
+
+    if ([string]::IsNullOrWhiteSpace($Action)) {
+        $Action = Show-McpMarketplaceActionMenu
+    }
+    if ([string]::IsNullOrWhiteSpace($Action)) {
+        Write-Info 'MCP marketplace phase skipped.'
+        return
+    }
+
+    $normalizedAction = $Action.Trim().ToLowerInvariant()
+    $targets = Resolve-McpTargetsByName -Target $Target -ExplicitPath $ClaudeDesktopConfigPath
+    if ($targets.Count -eq 0) {
+        Write-Info 'No target config selected.'
+        return
+    }
+
+    if ($normalizedAction -eq 'list') {
+        foreach ($cfg in $targets) {
+            Write-Info "File: $cfg"
+            $names = Get-McpServerNamesFromConfig -ConfigPath $cfg
+            if ($names.Count -eq 0) {
+                Write-Host '  (no MCP servers configured)'
+            } else {
+                foreach ($n in $names) { Write-Host "  - $n" }
+            }
+            Write-Host ''
+        }
+        return
+    }
+
+    $catalog = Get-McpMarketplaceCatalog
+    $selected = Normalize-McpServerNames -Names $Server
+    if ($selected.Count -eq 0) {
+        $selected = Prompt-McpServerSelection -Catalog $catalog
+    }
+    if ($selected.Count -eq 0) {
+        Write-Info 'No MCP servers selected.'
+        return
+    }
+
+    if ($normalizedAction -eq 'install') {
+        $pack = @{}
+        $unknown = [System.Collections.Generic.List[string]]::new()
+        foreach ($name in $selected) {
+            if ($catalog.ContainsKey($name)) {
+                $pack[$name] = $catalog[$name]
+            } else {
+                $unknown.Add($name) | Out-Null
+            }
+        }
+        if ($unknown.Count -gt 0) {
+            Write-Warning "Unknown server(s): $($unknown -join ', ')"
+        }
+        if ($pack.Count -eq 0) {
+            Write-Info 'No valid preset server selected.'
+            return
+        }
+        foreach ($cfg in $targets) {
+            Write-Info "Installing into: $cfg"
+            Merge-McpServers -ConfigPath $cfg -Servers $pack
+            Write-Ok "Installed: $($pack.Keys -join ', ')"
+        }
+        Write-Host ''
+        Write-Host "  $($script:Ansi.Y)Manual follow-up:$($script:Ansi.Rst)"
+        Write-Host "  $($script:Ansi.Gr)→ google-search : set GOOGLE_API_KEY and GOOGLE_CSE_ID$($script:Ansi.Rst)"
+        Write-Host "  $($script:Ansi.Gr)→ github        : set GITHUB_PERSONAL_ACCESS_TOKEN$($script:Ansi.Rst)"
+        Write-Host ''
+        return
+    }
+
+    if ($normalizedAction -eq 'remove') {
+        foreach ($cfg in $targets) {
+            Write-Info "Removing from: $cfg"
+            $removed = Remove-McpServersFromConfig -ConfigPath $cfg -Names $selected
+            if ($removed.Count -eq 0) {
+                Write-Info 'No matching servers found.'
+            } else {
+                Write-Ok "Removed: $($removed -join ', ')"
+            }
+        }
+        Write-Host ''
+        return
+    }
+
+    Write-Warning "Unsupported action: $Action"
 }
 
 # ── MCP phase orchestration ───────────────────────────────────────────────────

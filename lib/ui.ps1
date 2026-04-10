@@ -173,6 +173,7 @@ function Show-MainMenu {
         'Full setup       — environment check + plugins + MCP'
         'Plugins only     — install Claude Code plugins'
         'MCP only         — configure MCP servers'
+        'MCP marketplace  — list/install/remove MCP servers'
         'Exit'
     ) -Default '1'
 
@@ -180,7 +181,8 @@ function Show-MainMenu {
         '1' { return 'Full'        }
         '2' { return 'PluginsOnly' }
         '3' { return 'McpOnly'     }
-        '4' { return 'Exit'        }
+        '4' { return 'McpMarketplace' }
+        '5' { return 'Exit'        }
         default { return 'Full'    }
     }
 }
@@ -223,6 +225,20 @@ function Show-McpTargetMenu {
         '3' { $targets.Add($ClaudeCodePath); $targets.Add($DesktopPath) }
     }
     return ,$targets.ToArray()
+}
+function Show-McpMarketplaceActionMenu {
+    $choice = Read-MenuChoice -Title 'MCP marketplace action' -Options @(
+        'List installed MCP servers'
+        'Install preset MCP servers'
+        'Remove MCP servers'
+        'Back'
+    ) -Default '1'
+    switch ($choice) {
+        '1' { return 'List' }
+        '2' { return 'Install' }
+        '3' { return 'Remove' }
+        default { return '' }
+    }
 }
 
 # ── Interactive plugin picker (↑↓ + SPACE + ENTER) ────────────────────────────

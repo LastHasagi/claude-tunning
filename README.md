@@ -40,6 +40,27 @@ Local run (repo checkout):
 .\setup.ps1
 ```
 
-Optional: `-Mode Full|PluginsOnly|McpOnly`, `-LocalPluginsPath`, `-PluginsRawUrl`, `-ClaudeDesktopConfigPath`. See comment-based help on `setup.ps1`.
+Optional: `-Mode Full|PluginsOnly|McpOnly|McpMarketplace`, `-LocalPluginsPath`, `-PluginsRawUrl`, `-ClaudeDesktopConfigPath`. See comment-based help on `setup.ps1`.
+
+## MCP Auto-Configurator (Marketplace CLI)
+
+Use this mode to list, install, or remove preset MCP servers directly from PowerShell:
+
+```powershell
+.\setup.ps1 -Mode McpMarketplace -McpAction List -McpTarget Both
+.\setup.ps1 -Mode McpMarketplace -McpAction Install -McpServer google-search,github,filesystem -McpTarget ClaudeCode
+.\setup.ps1 -Mode McpMarketplace -McpAction Remove -McpServer github -McpTarget Desktop
+```
+
+Supported actions:
+- `List`    — shows MCP servers currently configured in target config file(s)
+- `Install` — adds preset servers to `mcpServers`
+- `Remove`  — removes selected server keys from `mcpServers`
+
+Supported preset servers:
+- `google-search`
+- `github`
+- `filesystem`
+- `context7`
 
 Scripts use **UTF-8 with BOM** for PS 5.1 Unicode; `bootstrap.ps1` is forced to **UTF-8 without BOM** at the end of `tools/ensure-utf8bom.ps1`. Run that script after edits if needed.
