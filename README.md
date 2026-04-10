@@ -40,7 +40,7 @@ Local run (repo checkout):
 .\setup.ps1
 ```
 
-Optional: `-Mode Full|PluginsOnly|McpOnly|McpMarketplace`, `-LocalPluginsPath`, `-PluginsRawUrl`, `-ClaudeDesktopConfigPath`. See comment-based help on `setup.ps1`.
+Optional: `-Mode Full|PluginsOnly|McpOnly|McpMarketplace|SubagentSetup`, `-LocalPluginsPath`, `-PluginsRawUrl`, `-ClaudeDesktopConfigPath`. See comment-based help on `setup.ps1`.
 
 ## MCP Auto-Configurator (Marketplace CLI)
 
@@ -62,5 +62,24 @@ Supported preset servers:
 - `github`
 - `filesystem`
 - `context7`
+
+## Subagent Auto-Configurator
+
+Use this mode to provision the `feature-card-handoff` subagent/skill for Claude Code, Cursor, and project-local folders:
+
+```powershell
+.\setup.ps1 -Mode SubagentSetup -SubagentTarget ClaudeCode
+.\setup.ps1 -Mode SubagentSetup -SubagentTarget Cursor
+.\setup.ps1 -Mode SubagentSetup -SubagentTarget Both
+.\setup.ps1 -Mode SubagentSetup -SubagentTarget Project
+.\setup.ps1 -Mode SubagentSetup -SubagentTarget All
+```
+
+Targets:
+- `ClaudeCode` — writes to `~/.claude/skills` and `~/.claude/agents`
+- `Cursor` — writes to `~/.cursor/skills` and `~/.cursor/agents`
+- `Both` — Claude Code + Cursor global
+- `Project` — writes to local `.claude/` and `.cursor/` in current folder
+- `All` — global + project local
 
 Scripts use **UTF-8 with BOM** for PS 5.1 Unicode; `bootstrap.ps1` is forced to **UTF-8 without BOM** at the end of `tools/ensure-utf8bom.ps1`. Run that script after edits if needed.

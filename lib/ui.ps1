@@ -174,6 +174,7 @@ function Show-MainMenu {
         'Plugins only     — install Claude Code plugins'
         'MCP only         — configure MCP servers'
         'MCP marketplace  — list/install/remove MCP servers'
+        'Subagent setup   — configure feature-card-handoff'
         'Exit'
     ) -Default '1'
 
@@ -182,7 +183,8 @@ function Show-MainMenu {
         '2' { return 'PluginsOnly' }
         '3' { return 'McpOnly'     }
         '4' { return 'McpMarketplace' }
-        '5' { return 'Exit'        }
+        '5' { return 'SubagentSetup' }
+        '6' { return 'Exit'        }
         default { return 'Full'    }
     }
 }
@@ -237,6 +239,24 @@ function Show-McpMarketplaceActionMenu {
         '1' { return 'List' }
         '2' { return 'Install' }
         '3' { return 'Remove' }
+        default { return '' }
+    }
+}
+function Show-SubagentTargetMenu {
+    $choice = Read-MenuChoice -Title 'Subagent setup target' -Options @(
+        'Claude Code global'
+        'Cursor global'
+        'Both global (Claude + Cursor)'
+        'Project local (.claude + .cursor)'
+        'All (global + project local)'
+        'Back'
+    ) -Default '3'
+    switch ($choice) {
+        '1' { return 'ClaudeCode' }
+        '2' { return 'Cursor' }
+        '3' { return 'Both' }
+        '4' { return 'Project' }
+        '5' { return 'All' }
         default { return '' }
     }
 }

@@ -17,6 +17,7 @@
     PluginsOnly — install Claude Code plugins and optional RTK setup.
     McpOnly     — configure MCP servers only.
     McpMarketplace — list/install/remove MCP servers via presets.
+    SubagentSetup — configure feature-card-handoff for Claude/Cursor/project.
     (Omit to show the interactive menu.)
 
 .PARAMETER LocalPluginsPath
@@ -42,10 +43,13 @@
 
 .EXAMPLE
     .\setup.ps1 -Mode McpMarketplace -McpAction Install -McpServer github,filesystem -McpTarget Both
+
+.EXAMPLE
+    .\setup.ps1 -Mode SubagentSetup -SubagentTarget All
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Full', 'PluginsOnly', 'McpOnly', 'McpMarketplace')]
+    [ValidateSet('Full', 'PluginsOnly', 'McpOnly', 'McpMarketplace', 'SubagentSetup')]
     [string]$Mode                    = '',
     [string]$LocalPluginsPath        = '',
     [string]$PluginsRawUrl           = 'https://raw.githubusercontent.com/LastHasagi/claude-tunning/main/plugins.txt',
@@ -54,7 +58,9 @@ param(
     [string]$McpAction               = '',
     [string[]]$McpServer             = @(),
     [ValidateSet('ClaudeCode', 'Desktop', 'Both')]
-    [string]$McpTarget               = 'ClaudeCode'
+    [string]$McpTarget               = 'ClaudeCode',
+    [ValidateSet('ClaudeCode', 'Cursor', 'Both', 'Project', 'All')]
+    [string]$SubagentTarget          = 'Both'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -67,7 +73,7 @@ if ([string]::IsNullOrWhiteSpace($root)) {
 
     Write-Host '  Downloading libraries...' -ForegroundColor Cyan
     $base = 'https://raw.githubusercontent.com/LastHasagi/claude-tunning/main'
-    foreach ($lib in 'lib/ui.ps1','lib/plugins.ps1','lib/mcp.ps1','lib/rtk.ps1') {
+    foreach ($lib in 'lib/ui.ps1','lib/plugins.ps1','lib/mcp.ps1','lib/rtk.ps1','lib/subagent.ps1') {
         $dest = Join-Path $root ($lib -replace '/','\')
         Invoke-WebRequest -Uri "$base/$lib" -OutFile $dest -UseBasicParsing -ErrorAction Stop
     }
@@ -78,6 +84,7 @@ if ([string]::IsNullOrWhiteSpace($root)) {
 . (Join-Path $root 'lib\plugins.ps1')
 . (Join-Path $root 'lib\mcp.ps1')
 . (Join-Path $root 'lib\rtk.ps1')
+. (Join-Path $root 'lib\subagent.ps1')
 
 # ── Startup ───────────────────────────────────────────────────────────────────
 Write-Banner
@@ -113,6 +120,9 @@ if ($Mode -eq 'McpMarketplace') {
         -Server $McpServer `
         -Target $McpTarget `
         -ClaudeDesktopConfigPath $ClaudeDesktopConfigPath
+}
+if ($Mode -eq 'SubagentSetup') {
+    Invoke-SubagentSetupPhase -Target $SubagentTarget -ScriptRoot (Get-Location).Path
 }
 
 # ── Phase 4 — RTK (optional, useful for Claude/Cursor shell compression) ──────
